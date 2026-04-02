@@ -1,12 +1,12 @@
 ---
 name: parse-pdf
-description: Analyzes a matrika index PDF from the Hradec Králové archive and creates a structured CSV file for database import. Use whenever the user downloads a new archival finding aid (archivní pomůcka) PDF from the Hradec Králové archive, mentions parsing matrika records, or wants to convert the registry book index to a spreadsheet/database.
+description: Analyzes a matrika index PDF from the Hradec Králové archive and creates a structured JSON file for database import. Use whenever the user downloads a new archival finding aid (archivní pomůcka) PDF from the Hradec Králové archive, mentions parsing matrika records, or wants to convert the registry book index to a structured format.
 ---
 
-# Parse Matrika PDF → CSV
+# Parse Matrika PDF → JSON
 
 Converts an archival finding aid PDF (Archivní pomůcka: matriky, SOA Hradec Králové) into a
-structured CSV table, one row per level-4 record (individual registry book).
+JSON array, one object per level-4 record (individual registry book).
 
 ## Record structure in the PDF
 
@@ -30,10 +30,10 @@ tematický popis jednotky popisu: fol. 116 ...                   ← optional
 existence kopií jednotky popisu: číslo mikrofilmu: 2377
 ```
 
-## CSV columns produced
+## JSON fields produced
 
-| Column | Source field |
-|--------|-------------|
+| Field | Source field |
+|-------|-------------|
 | `por_cislo` | Poř. č. (sequential number) |
 | `ukladaci_cislo` | Ukládací číslo (storage number) |
 | `puvodni_signatura` | původní signatura |
@@ -59,22 +59,22 @@ existence kopií jednotky popisu: číslo mikrofilmu: 2377
 ### Step 1 — Run the bundled script
 
 ```bash
-python3 .claude/skills/parse-pdf/scripts/parse_pdf.py "<pdf_path>" ["<output.csv>"]
+python3 .claude/skills/parse-pdf/scripts/parse_pdf.py "<pdf_path>" ["<output.json>"]
 ```
 
 - `pdf_path` — path to the PDF (passed as skill argument or taken from context)
-- `output_csv` — optional; defaults to `<pdf_name>.csv` next to the PDF, use `data.csv` if not asked by user to use other filename
+- `output_json` — optional; defaults to `<pdf_name>.json` next to the PDF, use `data.json` if not asked by user to use other filename
 - Installs `pdfplumber` automatically if missing
 
 ### Step 2 — Verify output
 
-After the script finishes, spot-check the CSV:
+After the script finishes, spot-check the JSON:
 
 ```bash
 python3 -c "
-import csv
-with open('<output.csv>', encoding='utf-8') as f:
-    rows = list(csv.DictReader(f))
+import json
+with open('<output.json>', encoding='utf-8') as f:
+    rows = json.load(f)
 print(f'{len(rows)} records')
 print('Sample:', rows[0])
 print('Sample:', rows[5])
@@ -91,7 +91,7 @@ Check that:
 
 Tell the user:
 - How many records were extracted
-- The output CSV path
+- The output JSON path
 - Any obvious issues found during spot-check (empty key fields, malformed dates)
 
 ## Skill argument
@@ -104,6 +104,6 @@ current working directory for a `.pdf` file, or ask the user.
 - **Pages before records** (title page, table of contents): skipped automatically — the script
   only processes text blocks that start with `původní signatura:`.
 - **Multi-line fields** (`matriční místo`, `původce`, title): regex spans newlines.
-- **Optional fields** (`fyzický stav`, `tematický popis`): left empty in CSV when absent.
+- **Optional fields** (`fyzický stav`, `tematický popis`): empty string in JSON when absent.
 - **Multiple microfilm numbers** (e.g. "2377, 2378"): captured as-is in `cislo_mikrofilmu`.
 - **Mixed languages** (e.g. "čeština, němčina"): captured as-is in `jazyk`.

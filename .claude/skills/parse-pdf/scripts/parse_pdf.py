@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
 """
-Parse matrika PDF index (Hradec Králové archive) and export records to CSV.
+Parse matrika PDF index (Hradec Králové archive) and export records to JSON.
 
 Usage:
-    python parse_pdf.py <pdf_path> [output_csv]
+    python parse_pdf.py <pdf_path> [output_json]
 
-Each level-4 record in the PDF becomes one CSV row with fields:
+Each level-4 record in the PDF becomes one JSON object with fields:
     por_cislo, ukladaci_cislo, puvodni_signatura, signatura,
     neplatne_inventarni_cislo, nazev, datace, uredni_kniha,
     odkaz_prohlizet, odkaz_stahnout, jazyk, rozmery, pocet_folii,
@@ -14,7 +14,7 @@ Each level-4 record in the PDF becomes one CSV row with fields:
 """
 
 import sys
-import csv
+import json
 import re
 import os
 
@@ -279,41 +279,27 @@ def parse_record(lines):
     return record
 
 
-FIELDNAMES = [
-    "por_cislo", "ukladaci_cislo",
-    "puvodni_signatura", "signatura", "neplatne_inventarni_cislo",
-    "nazev", "datace",
-    "uredni_kniha",
-    "odkaz_prohlizet", "odkaz_stahnout",
-    "jazyk", "rozmery", "pocet_folii", "vazba",
-    "puvudce", "matricni_misto",
-    "tematicky_popis", "fyzicky_stav", "cislo_mikrofilmu",
-]
-
-
-def parse_pdf(pdf_path, output_csv=None):
+def parse_pdf(pdf_path, output_json=None):
     if not os.path.exists(pdf_path):
         print(f"ERROR: File not found: {pdf_path}")
         sys.exit(1)
 
-    if output_csv is None:
+    if output_json is None:
         base = os.path.splitext(pdf_path)[0]
-        output_csv = base + ".csv"
+        output_json = base + ".json"
 
-    written = 0
-    with open(output_csv, "w", newline="", encoding="utf-8") as f:
-        writer = csv.DictWriter(f, fieldnames=FIELDNAMES)
-        writer.writeheader()
-        for block in iter_records(pdf_path):
-            rec = parse_record(block)
-            # Skip blocks that produced no meaningful data
-            if rec["puvodni_signatura"] or rec["nazev"]:
-                writer.writerow(rec)
-                written += 1
+    records = []
+    for block in iter_records(pdf_path):
+        rec = parse_record(block)
+        if rec["puvodni_signatura"] or rec["nazev"]:
+            records.append(rec)
 
-    print(f"Parsed {written} records, written to {output_csv}", flush=True)
+    with open(output_json, "w", encoding="utf-8") as f:
+        json.dump(records, f, ensure_ascii=False, indent=2)
+
+    print(f"Parsed {len(records)} records, written to {output_json}", flush=True)
     print("Done.", flush=True)
-    return output_csv, written
+    return output_json, len(records)
 
 
 if __name__ == "__main__":
@@ -321,5 +307,5 @@ if __name__ == "__main__":
         print(f"Usage: {sys.argv[0]} <pdf_path> [output_csv]")
         sys.exit(1)
     pdf_path = sys.argv[1]
-    output_csv = sys.argv[2] if len(sys.argv) > 2 else None
-    parse_pdf(pdf_path, output_csv)
+    output_json = sys.argv[2] if len(sys.argv) > 2 else None
+    parse_pdf(pdf_path, output_json)
