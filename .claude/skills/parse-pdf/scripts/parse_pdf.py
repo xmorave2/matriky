@@ -9,7 +9,7 @@ Each level-4 record in the PDF becomes one JSON object with fields:
     por_cislo, ukladaci_cislo, puvodni_signatura, signatura,
     neplatne_inventarni_cislo, nazev, datace, uredni_kniha,
     odkaz_prohlizet, odkaz_stahnout, jazyk, rozmery, pocet_folii,
-    vazba, puvudce, matricni_misto, matricni_misto_zkracene, tematicky_popis, fyzicky_stav,
+    vazba, puvodce, matricni_misto, matricni_misto_zkracene, tematicky_popis, fyzicky_stav,
     cislo_mikrofilmu
 """
 
@@ -172,7 +172,7 @@ def parse_record(lines):
     ]}
     # Array fields default to empty list
     record["jazyk"] = []
-    record["puvudce"] = []
+    record["puvodce"] = []
     record["matricni_misto"] = []
     record["matricni_misto_zkracene"] = []
     record["cislo_mikrofilmu"] = []
@@ -312,15 +312,15 @@ def parse_record(lines):
     # --- Původce (originator) ---
     # Runs until next labeled field.
     # Multiple entries are separated by "), " before an uppercase letter.
-    puvudce_m = re.search(
+    puvodce_m = re.search(
         r'původce:\s*(.*?)(?=\n(?:matriční místo:|tematický|fyzický|existence))',
         text, re.DOTALL | re.IGNORECASE
     )
-    if puvudce_m:
-        raw = re.sub(r'\s+', ' ', puvudce_m.group(1)).strip()
+    if puvodce_m:
+        raw = re.sub(r'\s+', ' ', puvodce_m.group(1)).strip()
         # Split on "), " followed by an uppercase letter (next entry start)
         parts = re.split(r'\),\s+(?=[A-ZÁČĎÉĚÍŇÓŘŠŤÚŮÝŽ])', raw)
-        record["puvudce"] = [p.strip().rstrip(',') + (')' if not p.strip().endswith(')') and i < len(parts)-1 else '') for i, p in enumerate(parts) if p.strip()]
+        record["puvodce"] = [p.strip().rstrip(',') + (')' if not p.strip().endswith(')') and i < len(parts)-1 else '') for i, p in enumerate(parts) if p.strip()]
 
     # --- Matriční místo ---
     # Semicolon-separated list of places → array

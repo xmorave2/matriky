@@ -48,7 +48,7 @@ existence kopií jednotky popisu: číslo mikrofilmu: 2377
 | `rozmery` | string | Dimensions (e.g. "24x37,5 cm") |
 | `pocet_folii` | string | Folio count (e.g. "326 fol.") |
 | `vazba` | string | Binding type |
-| `puvudce` | **array** | původce — split on `"), "` before uppercase |
+| `puvodce` | **array** | původce — split on `"), "` before uppercase |
 | `matricni_misto` | **array** | matriční místo — split on `"; "` |
 | `tematicky_popis` | string | tematický popis jednotky popisu (if present) |
 | `fyzicky_stav` | string | fyzický stav dokumentu … (if present) |
@@ -105,6 +105,6 @@ current working directory for a `.pdf` file, or ask the user.
 - **Pages before records** (title page, table of contents): skipped automatically — the script
   only processes text blocks that start with `původní signatura:`.
 - **Multi-line fields** (`matriční místo`, `původce`, title): regex spans newlines.
-- **Optional fields** (`fyzický stav`, `tematický popis`): empty string `""` when absent; array fields (`jazyk`, `puvudce`, `matricni_misto`, `cislo_mikrofilmu`) are `[]` when absent.
+- **Optional fields** (`fyzický stav`, `tematický popis`): empty string `""` when absent; array fields (`jazyk`, `puvodce`, `matricni_misto`, `cislo_mikrofilmu`) are `[]` when absent.
 - **Multiple microfilm numbers** (e.g. "2377, 2378"): captured as-is in `cislo_mikrofilmu`.
 - **Mixed languages** (e.g. "čeština, němčina"): captured as-is in `jazyk`.
