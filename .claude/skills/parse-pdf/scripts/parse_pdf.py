@@ -256,19 +256,32 @@ def parse_record(lines):
     record["nabozensky_puvod"] = _np
 
     # --- Record type(s) derived from nazev ---
-    # Matches blocks like "matrika NAROZENÝCH, ZEMŘELÝCH" or "index ODDANÝCH"
-    # and expands each into individual "matrika X" / "index X" entries.
+    # Matches full forms ("matrika NAROZENÝCH, ZEMŘELÝCH") and abbreviations
+    # ("matrika N", "index NOZ") and expands each to canonical entries.
+    _ABBREV_EXPAND = {'N': 'NAROZENÝCH', 'O': 'ODDANÝCH', 'Z': 'ZEMŘELÝCH'}
     _TYPE_BLOCK_RE = re.compile(
         r'\b(matrika|index)\s+'
-        r'((?:(?:NAROZENÝCH|ZEMŘELÝCH|ODDANÝCH)(?:,\s*)?)+)',
+        r'((?:(?:NAROZENÝCH|ZEMŘELÝCH|ODDANÝCH|[NOZ]{1,3})(?:,\s*)?)+)',
         re.IGNORECASE,
     )
-    _TYPE_WORD_RE = re.compile(r'NAROZENÝCH|ZEMŘELÝCH|ODDANÝCH', re.IGNORECASE)
+    _FULL_WORD_RE = re.compile(r'NAROZENÝCH|ZEMŘELÝCH|ODDANÝCH', re.IGNORECASE)
+    _ABBREV_TOKEN_RE = re.compile(r'^[NOZ]{1,3}$', re.IGNORECASE)
     typ = []
     for blk in _TYPE_BLOCK_RE.finditer(record["nazev"]):
         prefix = blk.group(1).lower()
-        for tw in _TYPE_WORD_RE.findall(blk.group(2)):
-            entry = f"{prefix} {tw.upper()}"
+        types_str = blk.group(2)
+        full_words = _FULL_WORD_RE.findall(types_str)
+        if full_words:
+            type_words = [tw.upper() for tw in full_words]
+        else:
+            # Expand abbreviations: "NOZ" → ["NAROZENÝCH", "ODDANÝCH", "ZEMŘELÝCH"]
+            type_words = []
+            for token in re.split(r',\s*', types_str.strip()):
+                if _ABBREV_TOKEN_RE.match(token.strip()):
+                    for letter in token.strip().upper():
+                        type_words.append(_ABBREV_EXPAND[letter])
+        for tw in type_words:
+            entry = f"{prefix} {tw}"
             if entry not in typ:
                 typ.append(entry)
     record["typ"] = typ
