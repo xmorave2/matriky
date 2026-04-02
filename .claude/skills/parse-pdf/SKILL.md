@@ -32,27 +32,28 @@ existence kopií jednotky popisu: číslo mikrofilmu: 2377
 
 ## JSON fields produced
 
-| Field | Source field |
-|-------|-------------|
-| `por_cislo` | Poř. č. (sequential number) |
-| `ukladaci_cislo` | Ukládací číslo (storage number) |
-| `puvodni_signatura` | původní signatura |
-| `signatura` | signatura |
-| `neplatne_inventarni_cislo` | neplatné inventární číslo |
-| `nazev` | Bold title text (type + localities) |
-| `datace` | Date range on the right of the title |
-| `uredni_kniha` | úřední kniha |
-| `odkaz_prohlizet` | "Prohlížet v ARchivu ONline" link |
-| `odkaz_stahnout` | "Stáhnout všechny snímky" link |
-| `jazyk` | Language(s) from physical description |
-| `rozmery` | Dimensions (e.g. "24x37,5 cm") |
-| `pocet_folii` | Folio count (e.g. "326 fol.") |
-| `vazba` | Binding type |
-| `puvudce` | původce |
-| `matricni_misto` | matriční místo |
-| `tematicky_popis` | tematický popis jednotky popisu (if present) |
-| `fyzicky_stav` | fyzický stav dokumentu … (if present) |
-| `cislo_mikrofilmu` | číslo mikrofilmu |
+| Field | Type | Source field |
+|-------|------|-------------|
+| `por_cislo` | string | Poř. č. (sequential number) |
+| `ukladaci_cislo` | string | Ukládací číslo (storage number) |
+| `puvodni_signatura` | string | původní signatura |
+| `signatura` | string | signatura |
+| `neplatne_inventarni_cislo` | string | neplatné inventární číslo |
+| `nazev` | string | Title text (type + localities) |
+| `datace` | string | Date range on the right of the title |
+| `uredni_kniha` | string | úřední kniha |
+| `odkaz_prohlizet` | string | "Prohlížet v ARchivu ONline" link |
+| `odkaz_stahnout` | string | "Stáhnout všechny snímky" link |
+| `jazyk` | **array** | Language(s) — split on `", "` |
+| `rozmery` | string | Dimensions (e.g. "24x37,5 cm") |
+| `pocet_folii` | string | Folio count (e.g. "326 fol.") |
+| `vazba` | string | Binding type |
+| `puvudce` | **array** | původce — split on `"), "` before uppercase |
+| `matricni_misto` | **array** | matriční místo — split on `"; "` |
+| `tematicky_popis` | string | tematický popis jednotky popisu (if present) |
+| `fyzicky_stav` | string | fyzický stav dokumentu … (if present) |
+| `cislo_mikrofilmu` | **array** | číslo mikrofilmu — split on `", "` |
+| `typ` | **array** | Record type(s) derived from `nazev` — each entry is one of: `"matrika NAROZENÝCH"`, `"matrika ZEMŘELÝCH"`, `"matrika ODDANÝCH"`, `"index NAROZENÝCH"`, `"index ZEMŘELÝCH"`, `"index ODDANÝCH"`. A combined title like `"matrika NAROZENÝCH, ZEMŘELÝCH"` expands to two entries. |
 
 ## How to run
 
@@ -104,6 +105,6 @@ current working directory for a `.pdf` file, or ask the user.
 - **Pages before records** (title page, table of contents): skipped automatically — the script
   only processes text blocks that start with `původní signatura:`.
 - **Multi-line fields** (`matriční místo`, `původce`, title): regex spans newlines.
-- **Optional fields** (`fyzický stav`, `tematický popis`): empty string in JSON when absent.
+- **Optional fields** (`fyzický stav`, `tematický popis`): empty string `""` when absent; array fields (`jazyk`, `puvudce`, `matricni_misto`, `cislo_mikrofilmu`) are `[]` when absent.
 - **Multiple microfilm numbers** (e.g. "2377, 2378"): captured as-is in `cislo_mikrofilmu`.
 - **Mixed languages** (e.g. "čeština, němčina"): captured as-is in `jazyk`.

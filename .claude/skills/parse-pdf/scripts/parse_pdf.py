@@ -161,16 +161,21 @@ def get_field(pattern, text, group=1, flags=re.IGNORECASE | re.MULTILINE):
 def parse_record(lines):
     text = "\n".join(lines)
 
-    record = {k: "" for k in [
+    record: dict = {k: "" for k in [
         "por_cislo", "ukladaci_cislo",
         "puvodni_signatura", "signatura", "neplatne_inventarni_cislo",
         "nazev", "datace",
         "uredni_kniha",
         "odkaz_prohlizet", "odkaz_stahnout",
-        "jazyk", "rozmery", "pocet_folii", "vazba",
-        "puvudce", "matricni_misto",
-        "tematicky_popis", "fyzicky_stav", "cislo_mikrofilmu",
+        "rozmery", "pocet_folii", "vazba",
+        "tematicky_popis", "fyzicky_stav",
     ]}
+    # Array fields default to empty list
+    record["jazyk"] = []
+    record["puvudce"] = []
+    record["matricni_misto"] = []
+    record["cislo_mikrofilmu"] = []
+    record["typ"] = []
 
     # --- Sequential / storage number ---
     # Pattern from PDF: "4   <por_cislo>   <ukladaci_cislo>"  on one line
@@ -223,6 +228,24 @@ def parse_record(lines):
         # Collapse whitespace in title
         record["nazev"] = re.sub(r'\s+', ' ', title_clean).strip()
 
+    # --- Record type(s) derived from nazev ---
+    # Matches blocks like "matrika NAROZENÝCH, ZEMŘELÝCH" or "index ODDANÝCH"
+    # and expands each into individual "matrika X" / "index X" entries.
+    _TYPE_BLOCK_RE = re.compile(
+        r'\b(matrika|index)\s+'
+        r'((?:(?:NAROZENÝCH|ZEMŘELÝCH|ODDANÝCH)(?:,\s*)?)+)',
+        re.IGNORECASE,
+    )
+    _TYPE_WORD_RE = re.compile(r'NAROZENÝCH|ZEMŘELÝCH|ODDANÝCH', re.IGNORECASE)
+    typ = []
+    for blk in _TYPE_BLOCK_RE.finditer(record["nazev"]):
+        prefix = blk.group(1).lower()
+        for tw in _TYPE_WORD_RE.findall(blk.group(2)):
+            entry = f"{prefix} {tw.upper()}"
+            if entry not in typ:
+                typ.append(entry)
+    record["typ"] = typ
+
     # --- Links (URLs injected as markers by iter_page_texts) ---
     record["odkaz_prohlizet"] = get_field(r'__VIEW_URL__:\s*(.+?)(?:\n|$)', text)
     record["odkaz_stahnout"]  = get_field(r'__DL_URL__:\s*(.+?)(?:\n|$)', text)
@@ -239,27 +262,34 @@ def parse_record(lines):
         text, re.IGNORECASE
     )
     if phys_m:
-        record["jazyk"] = phys_m.group(1).strip()
+        # jazyk: comma-separated languages → array
+        record["jazyk"] = [l.strip() for l in phys_m.group(1).split(',') if l.strip()]
         record["rozmery"] = phys_m.group(2).strip()
         record["pocet_folii"] = phys_m.group(3).strip()
         record["vazba"] = phys_m.group(4).strip()
 
     # --- Původce (originator) ---
-    # Runs until next labeled field
+    # Runs until next labeled field.
+    # Multiple entries are separated by "), " before an uppercase letter.
     puvudce_m = re.search(
         r'původce:\s*(.*?)(?=\n(?:matriční místo:|tematický|fyzický|existence))',
         text, re.DOTALL | re.IGNORECASE
     )
     if puvudce_m:
-        record["puvudce"] = re.sub(r'\s+', ' ', puvudce_m.group(1)).strip()
+        raw = re.sub(r'\s+', ' ', puvudce_m.group(1)).strip()
+        # Split on "), " followed by an uppercase letter (next entry start)
+        parts = re.split(r'\),\s+(?=[A-ZÁČĎÉĚÍŇÓŘŠŤÚŮÝŽ])', raw)
+        record["puvudce"] = [p.strip().rstrip(',') + (')' if not p.strip().endswith(')') and i < len(parts)-1 else '') for i, p in enumerate(parts) if p.strip()]
 
     # --- Matriční místo ---
+    # Semicolon-separated list of places → array
     mm_m = re.search(
         r'matriční místo:\s*(.*?)(?=\n(?:tematický|fyzický|existence|\Z))',
         text, re.DOTALL | re.IGNORECASE
     )
     if mm_m:
-        record["matricni_misto"] = re.sub(r'\s+', ' ', mm_m.group(1)).strip()
+        raw = re.sub(r'\s+', ' ', mm_m.group(1)).strip()
+        record["matricni_misto"] = [p.strip() for p in raw.split(';') if p.strip()]
 
     # --- Optional fields ---
     record["tematicky_popis"] = get_field(
@@ -272,9 +302,9 @@ def parse_record(lines):
         r'fyzický stav[^:]*:\s*(.+?)(?:\n|$)', text
     )
 
-    record["cislo_mikrofilmu"] = get_field(
-        r'číslo mikrofilmu:\s*(.+?)(?:\n|$)', text
-    )
+    # cislo_mikrofilmu: comma-separated numbers → array
+    cislo_raw = get_field(r'číslo mikrofilmu:\s*(.+?)(?:\n|$)', text)
+    record["cislo_mikrofilmu"] = [n.strip() for n in re.split(r',\s*', cislo_raw) if n.strip()] if cislo_raw else []
 
     return record
 
