@@ -9,7 +9,7 @@ Each level-4 record in the PDF becomes one JSON object with fields:
     por_cislo, ukladaci_cislo, puvodni_signatura, signatura,
     neplatne_inventarni_cislo, nazev, datace, uredni_kniha,
     odkaz_prohlizet, odkaz_stahnout, jazyk, rozmery, pocet_folii,
-    vazba, puvudce, matricni_misto, tematicky_popis, fyzicky_stav,
+    vazba, puvudce, matricni_misto, matricni_misto_zkracene, tematicky_popis, fyzicky_stav,
     cislo_mikrofilmu
 """
 
@@ -174,6 +174,7 @@ def parse_record(lines):
     record["jazyk"] = []
     record["puvudce"] = []
     record["matricni_misto"] = []
+    record["matricni_misto_zkracene"] = []
     record["cislo_mikrofilmu"] = []
     record["typ"] = []
 
@@ -330,6 +331,7 @@ def parse_record(lines):
     if mm_m:
         raw = re.sub(r'\s+', ' ', mm_m.group(1)).strip()
         record["matricni_misto"] = [p.strip() for p in raw.split(';') if p.strip()]
+        record["matricni_misto_zkracene"] = [p.split(' (')[0].strip() for p in record["matricni_misto"]]
 
     # --- Optional fields ---
     record["tematicky_popis"] = get_field(
