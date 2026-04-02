@@ -204,18 +204,27 @@ def parse_record(lines):
     record["uredni_kniha"] = get_field(r'úřední kniha:\s*(.+?)(?:\n|$)', text)
 
     # --- Title and date range ---
-    # Title block: lines between "neplatné inventární číslo:" and "úřední kniha:"
+    # Title block: lines between "neplatné inventární číslo:" and "úřední kniha:".
+    # Fallback: some records lack "neplatné inventární číslo:" — use "signatura:" instead.
     title_m = re.search(
         r'neplatné inventární číslo:[^\n]*\n(.*?)(?=\núřední kniha:)',
         text, re.DOTALL | re.IGNORECASE
     )
+    if not title_m:
+        title_m = re.search(
+            r'^signatura:[^\n]*\n(.*?)(?=\núřední kniha:)',
+            text, re.DOTALL | re.IGNORECASE | re.MULTILINE
+        )
     if title_m:
         title_raw = title_m.group(1).strip()
         # Date range is "YYYY–YYYY" or "měsíc YYYY – měsíc YYYY" at end of block
+        _M = r'(?:leden|únor|březen|duben|květen|červen|červenec|srpen|září|říjen|listopad|prosinec)'
         date_patterns = [
-            r'(\d{1,2}\.\s*\d{4}\s*[–-]\s*\d{1,2}\.\s*\d{4})\s*$',
-            r'(\d{4}\s*[–-]\s*\d{4})\s*$',
-            r'((?:leden|únor|březen|duben|květen|červen|červenec|srpen|září|říjen|listopad|prosinec)\s+\d{4}\s*[–-]\s*(?:leden|únor|březen|duben|květen|červen|červenec|srpen|září|říjen|listopad|prosinec)\s+\d{4})\s*$',
+            r'(\d{1,2}\.\s*\d{4}\s*[–-]\s*\d{1,2}\.\s*\d{4})\s*$',          # 5.1943 – 12.1949
+            rf'({_M}\s+\d{{4}}\s*[–-]\s*{_M}\s+\d{{4}})\s*$',                # květen 1943 – prosinec 1949
+            rf'({_M}\s+\d{{4}}\s*[–-]\s*\d{{4}})\s*$',                        # květen 1943 – 1949
+            rf'(\d{{4}}\s*[–-]\s*{_M}\s+\d{{4}})\s*$',                        # 1943 – prosinec 1949
+            r'(\d{4}\s*[–-]\s*\d{4})\s*$',                                    # 1943 – 1949
         ]
         for pat in date_patterns:
             dm = re.search(pat, title_raw, re.MULTILINE | re.IGNORECASE)
