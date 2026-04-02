@@ -164,7 +164,7 @@ def parse_record(lines):
     record: dict = {k: "" for k in [
         "por_cislo", "ukladaci_cislo",
         "puvodni_signatura", "signatura", "neplatne_inventarni_cislo",
-        "nazev", "datace",
+        "nazev", "datace", "nabozensky_puvod",
         "uredni_kniha",
         "odkaz_prohlizet", "odkaz_stahnout",
         "rozmery", "pocet_folii", "vazba",
@@ -217,6 +217,16 @@ def parse_record(lines):
         )
     if title_m:
         title_raw = title_m.group(1).strip()
+        # Strip leading page-break header lines that leak in via the signatura fallback
+        # (page number, "Označení", "Obsah Datace", "Úrov. Poř. č. Ukládací číslo")
+        _PAGE_HDR_LINE = re.compile(
+            r'^\s*(?:\d+|Označení|Obsah\s+Datace|Úrov\.\s*Poř\.\s*č\.\s*Ukládací\s*číslo)\s*$',
+            re.IGNORECASE,
+        )
+        title_lines = title_raw.splitlines()
+        while title_lines and _PAGE_HDR_LINE.match(title_lines[0]):
+            title_lines.pop(0)
+        title_raw = '\n'.join(title_lines).strip()
         # Date range is "YYYY–YYYY" or "měsíc YYYY – měsíc YYYY" at end of block
         _M = r'(?:leden|únor|březen|duben|květen|červen|červenec|srpen|září|říjen|listopad|prosinec)'
         date_patterns = [
@@ -236,6 +246,14 @@ def parse_record(lines):
             title_clean = title_raw
         # Collapse whitespace in title
         record["nazev"] = re.sub(r'\s+', ' ', title_clean).strip()
+
+    # --- Religious/civil origin: first word of nazev ---
+    _np = record["nazev"].split()[0] if record["nazev"] else ""
+    if _np == "matrika":
+        _np = ""
+    elif _np.endswith("ý"):
+        _np = _np[:-1] + "á"
+    record["nabozensky_puvod"] = _np
 
     # --- Record type(s) derived from nazev ---
     # Matches blocks like "matrika NAROZENÝCH, ZEMŘELÝCH" or "index ODDANÝCH"
