@@ -19,54 +19,138 @@ import re
 import os
 
 
-def ensure_pdfplumber():
-    try:
-        import pdfplumber
-        return pdfplumber
-    except ImportError:
-        print("pdfplumber not found, installing...", flush=True)
-        import subprocess
-        subprocess.check_call([sys.executable, "-m", "pip", "install", "pdfplumber", "-q"])
-        import pdfplumber
-        return pdfplumber
+def _extract_page_links(pdfium_c, doc, page):
+    """Return (view_urls, dl_urls) sorted top-to-bottom by annotation Y position."""
+    import ctypes
+    links = []
+    n = pdfium_c.FPDFPage_GetAnnotCount(page)
+    for j in range(n):
+        annot = pdfium_c.FPDFPage_GetAnnot(page, j)
+        link = pdfium_c.FPDFAnnot_GetLink(annot)
+        if link:
+            action = pdfium_c.FPDFLink_GetAction(link)
+            if action:
+                buf = (ctypes.c_char * 1024)()
+                nbytes = pdfium_c.FPDFAction_GetURIPath(doc, action, buf, 1024)
+                if nbytes > 0:
+                    url = buf.value[:nbytes].decode("utf-8", errors="replace")
+                    rect = pdfium_c.FS_RECTF()
+                    pdfium_c.FPDFAnnot_GetRect(annot, rect)
+                    links.append((rect.top, url))
+        pdfium_c.FPDFPage_CloseAnnot(annot)
+    links.sort(key=lambda x: -x[0])  # top-to-bottom = decreasing Y in PDF coords
+    view_urls = [u for _, u in links if "aron." in u or "/apu/" in u]
+    dl_urls   = [u for _, u in links if "aron." not in u and "/apu/" not in u]
+    return view_urls, dl_urls
 
 
-def extract_text_pages(pdf_path):
-    pdfplumber = ensure_pdfplumber()
-    pages = []
-    with pdfplumber.open(pdf_path) as pdf:
-        total = len(pdf.pages)
-        print(f"PDF has {total} pages, extracting text...", flush=True)
-        for i, page in enumerate(pdf.pages, 1):
-            text = page.extract_text(x_tolerance=3, y_tolerance=3) or ""
-            pages.append(text)
-            if i % 50 == 0:
-                print(f"  {i}/{total} pages processed", flush=True)
-    return pages
+def iter_page_texts(pdf_path):
+    """Yield (page_num, total, text) one page at a time, releasing each page from memory
+    immediately (pypdfium2 explicit close).
 
-
-def split_into_records(pages):
-    """Split full text into individual record blocks.
-
-    Each level-4 record block starts with 'původní signatura:' and ends
-    just before the next one (or EOF).
+    Link annotations are injected as __VIEW_URL__ / __DL_URL__ marker lines right after the
+    "ARchivu ONline" / "Stáhnout" text they belong to, so they end up in the correct record
+    block during streaming. Falls back to pdfplumber (no link extraction) if pypdfium2 is absent.
     """
-    all_lines = []
-    for page_text in pages:
-        all_lines.extend(page_text.split("\n"))
+    try:
+        import pypdfium2 as pdfium
+        import pypdfium2.raw as pdfium_c
+        doc = pdfium.PdfDocument(pdf_path)
+        total = len(doc)
+        print(f"PDF has {total} pages, extracting text...", flush=True)
+        for i in range(total):
+            page = doc[i]
+            textpage = page.get_textpage()
+            raw_text = textpage.get_text_range()
+            textpage.close()
+            view_urls, dl_urls = _extract_page_links(pdfium_c, doc, page)
+            page.close()
 
-    # Locate record start lines
-    starts = [i for i, l in enumerate(all_lines) if l.strip().startswith("původní signatura:")]
-    print(f"Found {len(starts)} records", flush=True)
+            # Inject URL markers after matching link-text lines
+            view_idx = dl_idx = 0
+            out_lines = []
+            for line in raw_text.splitlines():
+                out_lines.append(line)
+                if "ARchivu ONline" in line and view_idx < len(view_urls):
+                    out_lines.append(f"__VIEW_URL__: {view_urls[view_idx]}")
+                    view_idx += 1
+                elif "Stáhnout všechny snímky" in line and dl_idx < len(dl_urls):
+                    out_lines.append(f"__DL_URL__: {dl_urls[dl_idx]}")
+                    dl_idx += 1
 
-    blocks = []
-    for idx, start in enumerate(starts):
-        end = starts[idx + 1] if idx + 1 < len(starts) else len(all_lines)
-        # Also grab up to 3 lines BEFORE the start to capture por_cislo / ukladaci_cislo
-        pre_start = max(0, start - 3)
-        blocks.append(all_lines[pre_start:end])
+            yield i + 1, total, "\n".join(out_lines)
+        doc.close()
+    except ImportError:
+        try:
+            import pdfplumber
+        except ImportError:
+            import subprocess
+            subprocess.check_call([sys.executable, "-m", "pip", "install", "pdfplumber", "-q"])
+            import pdfplumber
+        with pdfplumber.open(pdf_path) as pdf:
+            total = len(pdf.pages)
+            print(f"PDF has {total} pages, extracting text...", flush=True)
+            for i, page in enumerate(pdf.pages, 1):
+                text = page.extract_text(x_tolerance=3, y_tolerance=3) or ""
+                yield i, total, text
 
-    return blocks
+
+def iter_records(pdf_path):
+    """Yield line-blocks for each record, one page at a time (low memory).
+
+    Each block is a list of lines: up to 3 pre-lines (for por_cislo /
+    ukladaci_cislo) followed by lines from 'původní signatura:' up to
+    (but not including) the next record boundary.
+    """
+    current_block = None  # lines belonging to the record being built
+    pre_lines = []        # rolling window of lines before a record starts
+    record_count = 0
+
+    for i, total, text in iter_page_texts(pdf_path):
+        for line in text.splitlines():
+            if line.strip().startswith("původní signatura:"):
+                if current_block is not None:
+                    # The "4 <por_cislo> <ukladaci_cislo>" level-row line for the
+                    # *next* record appears at the end of the current block,
+                    # sometimes followed by page-break column headers.
+                    # Scan backward, skip page headers, extract the level row.
+                    _PAGE_HDR = re.compile(
+                        r'^\s*(?:\d+|Označení|Obsah\s+Datace'
+                        r'|Úrov\.\s*Poř\.\s*č\.\s*Ukládací\s*číslo)\s*$',
+                        re.IGNORECASE,
+                    )
+                    _LEVEL_ROW = re.compile(r'^\s*4\s+\d+\s+\d+\s*$')
+                    trailing = []
+                    for _k in range(1, min(8, len(current_block)) + 1):
+                        _l = current_block[-_k].strip()
+                        if _LEVEL_ROW.match(_l):
+                            trailing = [current_block[-_k]]
+                            current_block = current_block[:-_k]
+                            break
+                        elif _PAGE_HDR.match(_l):
+                            continue  # skip page header, keep scanning
+                        else:
+                            break     # real record data — stop
+                    record_count += 1
+                    yield current_block
+                    pre_lines = trailing
+                # Start new block: include recent pre-lines for por_cislo
+                current_block = pre_lines[-3:] + [line]
+                pre_lines = []
+            elif current_block is not None:
+                current_block.append(line)
+            else:
+                pre_lines.append(line)
+                if len(pre_lines) > 3:
+                    pre_lines.pop(0)
+        if i % 50 == 0:
+            print(f"  {i}/{total} pages processed", flush=True)
+
+    if current_block is not None:
+        record_count += 1
+        yield current_block
+
+    print(f"Found {record_count} records", flush=True)
 
 
 def get_field(pattern, text, group=1, flags=re.IGNORECASE | re.MULTILINE):
@@ -139,13 +223,9 @@ def parse_record(lines):
         # Collapse whitespace in title
         record["nazev"] = re.sub(r'\s+', ' ', title_clean).strip()
 
-    # --- Links ---
-    # "Prohlížet v ARchivu ONline" and "Stáhnout všechny snímky" are clickable
-    # pdfplumber may or may not capture URLs; capture the link text at minimum
-    record["odkaz_prohlizet"] = get_field(r'(https?://[^\s]+(?:detail|view|record)[^\s]*)', text) or \
-        ("Prohlížet v ARchivu ONline" if "ARchivu ONline" in text else "")
-    record["odkaz_stahnout"] = get_field(r'(https?://[^\s]+(?:download|snimk)[^\s]*)', text) or \
-        ("Stáhnout všechny snímky" if "Stáhnout všechny snímky" in text else "")
+    # --- Links (URLs injected as markers by iter_page_texts) ---
+    record["odkaz_prohlizet"] = get_field(r'__VIEW_URL__:\s*(.+?)(?:\n|$)', text)
+    record["odkaz_stahnout"]  = get_field(r'__DL_URL__:\s*(.+?)(?:\n|$)', text)
 
     # --- Physical description line ---
     # Format: "<jazyk(y)>; <dim> cm, <N> fol.; vazba: <vazba>"
@@ -220,25 +300,20 @@ def parse_pdf(pdf_path, output_csv=None):
         base = os.path.splitext(pdf_path)[0]
         output_csv = base + ".csv"
 
-    pages = extract_text_pages(pdf_path)
-    blocks = split_into_records(pages)
-
-    records = []
-    for block in blocks:
-        rec = parse_record(block)
-        # Skip blocks that produced no meaningful data
-        if rec["puvodni_signatura"] or rec["nazev"]:
-            records.append(rec)
-
-    print(f"Parsed {len(records)} records, writing to {output_csv}", flush=True)
-
+    written = 0
     with open(output_csv, "w", newline="", encoding="utf-8") as f:
         writer = csv.DictWriter(f, fieldnames=FIELDNAMES)
         writer.writeheader()
-        writer.writerows(records)
+        for block in iter_records(pdf_path):
+            rec = parse_record(block)
+            # Skip blocks that produced no meaningful data
+            if rec["puvodni_signatura"] or rec["nazev"]:
+                writer.writerow(rec)
+                written += 1
 
+    print(f"Parsed {written} records, written to {output_csv}", flush=True)
     print("Done.", flush=True)
-    return output_csv, len(records)
+    return output_csv, written
 
 
 if __name__ == "__main__":

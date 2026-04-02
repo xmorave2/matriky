@@ -59,11 +59,11 @@ existence kopií jednotky popisu: číslo mikrofilmu: 2377
 ### Step 1 — Run the bundled script
 
 ```bash
-python .claude/skills/parse-pdf/scripts/parse_pdf.py "<pdf_path>" ["<output.csv>"]
+python3 .claude/skills/parse-pdf/scripts/parse_pdf.py "<pdf_path>" ["<output.csv>"]
 ```
 
 - `pdf_path` — path to the PDF (passed as skill argument or taken from context)
-- `output_csv` — optional; defaults to `<pdf_name>.csv` next to the PDF
+- `output_csv` — optional; defaults to `<pdf_name>.csv` next to the PDF, use `data.csv` if not asked by user to use other filename
 - Installs `pdfplumber` automatically if missing
 
 ### Step 2 — Verify output
