@@ -10,7 +10,7 @@ Each level-4 record in the PDF becomes one JSON object with fields:
     neplatne_inventarni_cislo, nazev, datace, uredni_kniha,
     odkaz_prohlizet, odkaz_stahnout, jazyk, rozmery, pocet_folii,
     vazba, puvodce, matricni_misto, matricni_misto_zkracene, tematicky_popis, fyzicky_stav,
-    cislo_mikrofilmu
+    omezeni_pristupnosti, cislo_mikrofilmu
 """
 
 import sys
@@ -168,7 +168,7 @@ def parse_record(lines):
         "uredni_kniha",
         "odkaz_prohlizet", "odkaz_stahnout",
         "rozmery", "pocet_folii", "vazba",
-        "tematicky_popis", "fyzicky_stav",
+        "tematicky_popis", "fyzicky_stav", "omezeni_pristupnosti",
     ]}
     # Array fields default to empty list
     record["jazyk"] = []
@@ -325,7 +325,7 @@ def parse_record(lines):
     # --- Matriční místo ---
     # Semicolon-separated list of places → array
     mm_m = re.search(
-        r'matriční místo:\s*(.*?)(?=\n(?:tematický|fyzický|existence|\Z))',
+        r'matriční místo:\s*(.*?)(?=\n(?:omezení|tematický|fyzický|existence|\Z))',
         text, re.DOTALL | re.IGNORECASE
     )
     if mm_m:
@@ -335,13 +335,17 @@ def parse_record(lines):
 
     # --- Optional fields ---
     record["tematicky_popis"] = get_field(
-        r'tematický popis jednotky popisu:\s*(.*?)(?=\n(?:fyzický|existence)|$)',
+        r'tematický popis jednotky popisu:\s*(.*?)(?=\n(?:omezení|fyzický|existence)|$)',
         text, flags=re.DOTALL | re.IGNORECASE
     )
     record["tematicky_popis"] = re.sub(r'\s+', ' ', record["tematicky_popis"]).strip()
 
     record["fyzicky_stav"] = get_field(
         r'fyzický stav[^:]*:\s*(.+?)(?:\n|$)', text
+    )
+
+    record["omezeni_pristupnosti"] = get_field(
+        r'omezení přístupnosti:\s*(.+?)(?:\n|$)', text
     )
 
     # cislo_mikrofilmu: comma-separated numbers → array
