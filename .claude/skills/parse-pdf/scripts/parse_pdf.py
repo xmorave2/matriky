@@ -98,51 +98,23 @@ def iter_page_texts(pdf_path):
 def iter_records(pdf_path):
     """Yield line-blocks for each record, one page at a time (low memory).
 
-    Each block is a list of lines: up to 3 pre-lines (for por_cislo /
-    ukladaci_cislo) followed by lines from 'původní signatura:' up to
-    (but not including) the next record boundary.
+    Each block starts with the '4 <por_cislo> <ukladaci_cislo>' level-4 row
+    and continues until (but not including) the next such row. This handles
+    records that lack 'původní signatura:' and start directly with 'signatura:'.
     """
-    current_block = None  # lines belonging to the record being built
-    pre_lines = []        # rolling window of lines before a record starts
+    _LEVEL4_RE = re.compile(r'^\s*4\s+\d+\s+\d+\s*$')
+    current_block = None
     record_count = 0
 
     for i, total, text in iter_page_texts(pdf_path):
         for line in text.splitlines():
-            if line.strip().startswith("původní signatura:"):
+            if _LEVEL4_RE.match(line):
                 if current_block is not None:
-                    # The "4 <por_cislo> <ukladaci_cislo>" level-row line for the
-                    # *next* record appears at the end of the current block,
-                    # sometimes followed by page-break column headers.
-                    # Scan backward, skip page headers, extract the level row.
-                    _PAGE_HDR = re.compile(
-                        r'^\s*(?:\d+|Označení|Obsah\s+Datace'
-                        r'|Úrov\.\s*Poř\.\s*č\.\s*Ukládací\s*číslo)\s*$',
-                        re.IGNORECASE,
-                    )
-                    _LEVEL_ROW = re.compile(r'^\s*4\s+\d+\s+\d+\s*$')
-                    trailing = []
-                    for _k in range(1, min(8, len(current_block)) + 1):
-                        _l = current_block[-_k].strip()
-                        if _LEVEL_ROW.match(_l):
-                            trailing = [current_block[-_k]]
-                            current_block = current_block[:-_k]
-                            break
-                        elif _PAGE_HDR.match(_l):
-                            continue  # skip page header, keep scanning
-                        else:
-                            break     # real record data — stop
                     record_count += 1
                     yield current_block
-                    pre_lines = trailing
-                # Start new block: include recent pre-lines for por_cislo
-                current_block = pre_lines[-3:] + [line]
-                pre_lines = []
+                current_block = [line]
             elif current_block is not None:
                 current_block.append(line)
-            else:
-                pre_lines.append(line)
-                if len(pre_lines) > 3:
-                    pre_lines.pop(0)
         if i % 50 == 0:
             print(f"  {i}/{total} pages processed", flush=True)
 
@@ -367,7 +339,7 @@ def parse_pdf(pdf_path, output_json=None):
     records = []
     for block in iter_records(pdf_path):
         rec = parse_record(block)
-        if rec["puvodni_signatura"] or rec["nazev"]:
+        if rec["puvodni_signatura"] or rec["signatura"] or rec["nazev"]:
             records.append(rec)
 
     with open(output_json, "w", encoding="utf-8") as f:
