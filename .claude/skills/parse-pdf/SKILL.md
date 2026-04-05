@@ -41,6 +41,8 @@ existence kopií jednotky popisu: číslo mikrofilmu: 2377
 | `neplatne_inventarni_cislo` | string | neplatné inventární číslo |
 | `nazev` | string | Title text (type + localities) |
 | `datace` | string | Date range on the right of the title |
+| `rok_od` | int\|null | Start year extracted from `datace` |
+| `rok_do` | int\|null | End year extracted from `datace` |
 | `uredni_kniha` | string | úřední kniha |
 | `odkaz_prohlizet` | string | "Prohlížet v ARchivu ONline" link |
 | `odkaz_stahnout` | string | "Stáhnout všechny snímky" link |

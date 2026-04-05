@@ -18,6 +18,16 @@ import json
 import re
 import os
 
+def parse_roky(datace: str):
+    """Extract start and end year from a datace string (any format)."""
+    roky = re.findall(r'\b(1[0-9]{3}|20[0-9]{2})\b', datace)
+    if len(roky) >= 2:
+        return int(roky[0]), int(roky[-1])
+    if len(roky) == 1:
+        return int(roky[0]), int(roky[0])
+    return None, None
+
+
 _PAGE_HDR_LINE = re.compile(
     r'^\s*(?:\d+|Označení|Obsah\s+Datace|Úrov\.\s*Poř\.\s*č\.\s*Ukládací\s*číslo)\s*$',
     re.IGNORECASE,
@@ -148,6 +158,9 @@ def parse_record(lines):
         "rozmery", "pocet_folii", "vazba",
         "tematicky_popis", "fyzicky_stav", "omezeni_pristupnosti",
     ]}
+    # Numeric year range (filled after datace is parsed)
+    record["rok_od"] = None
+    record["rok_do"] = None
     # Array fields default to empty list
     record["jazyk"] = []
     record["puvodce"] = []
@@ -209,10 +222,15 @@ def parse_record(lines):
             dm = re.search(pat, title_raw, re.MULTILINE | re.IGNORECASE)
             if dm:
                 record["datace"] = dm.group(1).strip()
-                title_clean = title_raw[:dm.start()].strip()
+                # Remove the date from wherever it appears in the block
+                # (may be mid-block when title wraps across a page break)
+                title_clean = (title_raw[:dm.start()] + title_raw[dm.end():]).strip()
                 break
         else:
             title_clean = title_raw
+        rok_od, rok_do = parse_roky(record["datace"])
+        record["rok_od"] = rok_od
+        record["rok_do"] = rok_do
         # Collapse whitespace in title
         record["nazev"] = re.sub(r'\s+', ' ', title_clean).strip()
 

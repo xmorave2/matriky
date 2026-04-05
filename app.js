@@ -22,6 +22,7 @@ const paginationEl   = document.getElementById('pagination');
 const prevBtn        = document.getElementById('prev-btn');
 const nextBtn        = document.getElementById('next-btn');
 const pageInfoEl     = document.getElementById('page-info');
+const rokInput       = document.getElementById('rok-input');
 const resetBtn       = document.getElementById('reset-btn');
 const resetLink      = document.getElementById('reset-link');
 
@@ -68,6 +69,7 @@ function runSearch() {
   const selectedTyp    = getChecked('typ');
   const selectedJazyk  = getChecked('jazyk');
   const selectedVyzani = getChecked('vyzani');
+  const rok = rokInput.value ? parseInt(rokInput.value, 10) : null;
 
   let candidates;
 
@@ -98,6 +100,12 @@ function runSearch() {
   if (selectedVyzani.length) {
     candidates = candidates.filter(r =>
       selectedVyzani.includes(r.nabozensky_puvod)
+    );
+  }
+  if (rok !== null) {
+    candidates = candidates.filter(r =>
+      r.rok_od !== null && r.rok_do !== null &&
+      r.rok_od <= rok && rok <= r.rok_do
     );
   }
 
@@ -315,6 +323,7 @@ function escHtml(str) {
 // Reset all filters and search
 function resetAll() {
   searchInput.value = '';
+  rokInput.value = '';
   document.querySelectorAll('input[type="checkbox"]').forEach(cb => { cb.checked = false; });
   datalist.innerHTML = '';
   runSearch();
@@ -331,6 +340,8 @@ function updateHash() {
   if (jazyk.length) params.set('jazyk', jazyk.join(','));
   const vyzani = getChecked('vyzani');
   if (vyzani.length) params.set('vyzani', vyzani.join(','));
+  const rokVal = rokInput.value.trim();
+  if (rokVal) params.set('rok', rokVal);
 
   const hash = params.toString();
   history.replaceState(null, '', hash ? '#' + hash : location.pathname);
@@ -360,6 +371,7 @@ function restoreFromHash() {
       if (cb) cb.checked = true;
     });
   }
+  if (params.has('rok')) rokInput.value = params.get('rok');
 }
 
 // Wire up Fuse after it loads (it's deferred, may not be ready at init)
@@ -392,6 +404,10 @@ async function init() {
   // Event listeners
   searchInput.addEventListener('input', onSearchInput);
   searchInput.addEventListener('change', () => { ensureFuse(); runSearch(); });
+  rokInput.addEventListener('input', () => {
+    clearTimeout(searchDebounceTimer);
+    searchDebounceTimer = setTimeout(runSearch, 300);
+  });
   document.querySelectorAll('input[type="checkbox"]').forEach(cb =>
     cb.addEventListener('change', runSearch)
   );
