@@ -197,19 +197,12 @@ function renderCard(record) {
   if (places.length > 0) {
     const placesEl = document.createElement('div');
     placesEl.className = 'card-places';
-    const MAX_PLACES = 6;
-    places.slice(0, MAX_PLACES).forEach(p => {
+    places.forEach(p => {
       const tag = document.createElement('span');
       tag.className = 'place-tag';
       tag.textContent = p;
       placesEl.appendChild(tag);
     });
-    if (places.length > MAX_PLACES) {
-      const more = document.createElement('span');
-      more.className = 'place-more';
-      more.textContent = `+${places.length - MAX_PLACES} dalších`;
-      placesEl.appendChild(more);
-    }
     article.appendChild(placesEl);
   }
 

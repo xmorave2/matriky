@@ -208,7 +208,6 @@ main {
   font-size: .75rem;
   color: var(--grey);
 }
-.place-more { font-size: .75rem; color: var(--text-muted); align-self: center; }
 
 .card-chips {
   display: flex;
