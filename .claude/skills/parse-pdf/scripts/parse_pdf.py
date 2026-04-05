@@ -18,6 +18,11 @@ import json
 import re
 import os
 
+_PAGE_HDR_LINE = re.compile(
+    r'^\s*(?:\d+|Označení|Obsah\s+Datace|Úrov\.\s*Poř\.\s*č\.\s*Ukládací\s*číslo)\s*$',
+    re.IGNORECASE,
+)
+
 
 def _extract_page_links(pdfium_c, doc, page):
     """Return (view_urls, dl_urls) sorted top-to-bottom by annotation Y position."""
@@ -114,7 +119,8 @@ def iter_records(pdf_path):
                     yield current_block
                 current_block = [line]
             elif current_block is not None:
-                current_block.append(line)
+                if not _PAGE_HDR_LINE.match(line):
+                    current_block.append(line)
         if i % 50 == 0:
             print(f"  {i}/{total} pages processed", flush=True)
 
@@ -190,16 +196,6 @@ def parse_record(lines):
         )
     if title_m:
         title_raw = title_m.group(1).strip()
-        # Strip leading page-break header lines that leak in via the signatura fallback
-        # (page number, "Označení", "Obsah Datace", "Úrov. Poř. č. Ukládací číslo")
-        _PAGE_HDR_LINE = re.compile(
-            r'^\s*(?:\d+|Označení|Obsah\s+Datace|Úrov\.\s*Poř\.\s*č\.\s*Ukládací\s*číslo)\s*$',
-            re.IGNORECASE,
-        )
-        title_lines = title_raw.splitlines()
-        while title_lines and _PAGE_HDR_LINE.match(title_lines[0]):
-            title_lines.pop(0)
-        title_raw = '\n'.join(title_lines).strip()
         # Date range is "YYYY–YYYY" or "měsíc YYYY – měsíc YYYY" at end of block
         _M = r'(?:leden|únor|březen|duben|květen|červen|červenec|srpen|září|říjen|listopad|prosinec)'
         date_patterns = [
