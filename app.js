@@ -25,6 +25,8 @@ const pageInfoEl     = document.getElementById('page-info');
 const rokInput       = document.getElementById('rok-input');
 const resetBtn       = document.getElementById('reset-btn');
 const resetLink      = document.getElementById('reset-link');
+const appVersionEl   = document.getElementById('app-version');
+if (appVersionEl && typeof APP_VERSION !== 'undefined') appVersionEl.textContent = APP_VERSION;
 
 // Czech collator for sorting
 const collator = new Intl.Collator('cs', { sensitivity: 'base' });

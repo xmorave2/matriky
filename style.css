@@ -305,3 +305,19 @@ main {
 #pagination button:hover:not(:disabled) { background: var(--grey-light); }
 #pagination button:disabled { opacity: .4; cursor: not-allowed; }
 #page-info { color: var(--text-muted); min-width: 120px; text-align: center; }
+
+/* Footer */
+.site-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: .6rem 1.5rem;
+  margin-top: 2rem;
+  background: #1e3a5f;
+  color: rgba(255,255,255,.6);
+  font-size: .75rem;
+}
+.version-badge {
+  font-family: monospace;
+  color: rgba(255,255,255,.4);
+}
