@@ -117,7 +117,7 @@ def iter_records(pdf_path):
     and continues until (but not including) the next such row. This handles
     records that lack 'původní signatura:' and start directly with 'signatura:'.
     """
-    _LEVEL4_RE = re.compile(r'^\s*4\s+\d+\s+\d+\s*$')
+    _LEVEL4_RE = re.compile(r'^\s*[1-4]\s+\d+(?:\s+\d+)?\s*$')
     current_block = None
     record_count = 0
 
@@ -173,7 +173,7 @@ def parse_record(lines):
     # Pattern from PDF: "4   <por_cislo>   <ukladaci_cislo>"  on one line
     # May appear as "4  10  6" or just the numbers without the "4" prefix
     for line in lines[:4]:
-        m = re.match(r'^\s*4\s+(\d+)\s+(\d+)\s*$', line)
+        m = re.match(r'^\s*[34]\s+(\d+)\s+(\d+)\s*$', line)
         if m:
             record["por_cislo"] = m.group(1)
             record["ukladaci_cislo"] = m.group(2)
