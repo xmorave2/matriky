@@ -311,7 +311,7 @@ def parse_record(lines):
     # --- Matriční místo ---
     # Semicolon-separated list of places → array
     mm_m = re.search(
-        r'matriční místo:\s*(.*?)(?=\n(?:omezení|tematický|fyzický|existence|\Z))',
+        r'matriční místo:\s*(.*?)(?=\n(?:omezení|tematický|fyzický|existence)|\Z)',
         text, re.DOTALL | re.IGNORECASE
     )
     if mm_m:
