@@ -1,4 +1,9 @@
 {
   "cleanUrls": true,
-  "trailingSlash": false
+  "trailingSlash": false,
+  "buildCommand": "npm run build",
+  "outputDirectory": ".",
+  "functions": {
+    "api/*.js": { "memory": 512, "maxDuration": 30 }
+  }
 }

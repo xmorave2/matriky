@@ -1,11 +1,13 @@
 {
   "name": "matriky",
-  "version": "0.1.0",
+  "version": "0.3.1",
   "private": true,
   "scripts": {
+    "build": "node scripts/hash-data.js",
     "version": "node -e \"require('fs').writeFileSync('version.js', \\\"const APP_VERSION='\\\" + process.env.npm_new_version + \\\"';\\\\n\\\")\" && git add version.js"
   },
   "dependencies": {
-    "@vercel/analytics": "^2.0.1"
+    "@vercel/analytics": "^2.0.1",
+    "@neondatabase/serverless": "^0.10.4"
   }
 }

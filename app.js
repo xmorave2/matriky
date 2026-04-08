@@ -3,13 +3,11 @@
 const PAGE_SIZE = 20;
 
 // State
-let allRecords = [];
-let placeIndex = new Map();   // normalized-string -> Set<recordIndex>
-let allPlaces = [];           // sorted list for autocomplete
+let allPlaces = [];           // sorted list for autocomplete (loaded from /api/places)
 let fuse = null;
-let currentResults = [];
 let currentPage = 1;
 let searchDebounceTimer = null;
+let currentTotal = 0;
 
 // DOM refs
 const searchInput    = document.getElementById('search-input');
@@ -28,34 +26,12 @@ const resetLink      = document.getElementById('reset-link');
 const appVersionEl   = document.getElementById('app-version');
 if (appVersionEl && typeof APP_VERSION !== 'undefined') appVersionEl.textContent = APP_VERSION;
 
-// Czech collator for sorting
+// Czech collator for sorting places
 const collator = new Intl.Collator('cs', { sensitivity: 'base' });
 
-// Normalize string for search: lowercase + strip diacritics
+// Normalize string for autocomplete matching: lowercase + strip diacritics
 function normalize(str) {
   return str.normalize('NFD').replace(/\p{Diacritic}/gu, '').toLowerCase();
-}
-
-// Build inverted place index and autocomplete list
-function buildIndexes() {
-  placeIndex.clear();
-  const placeSet = new Set();
-
-  allRecords.forEach((record, i) => {
-    (record.matricni_misto_zkracene ?? []).forEach(place => {
-      const key = normalize(place);
-      if (!placeIndex.has(key)) placeIndex.set(key, new Set());
-      placeIndex.get(key).add(i);
-      placeSet.add(place);
-    });
-  });
-
-  allPlaces = [...placeSet].sort((a, b) => collator.compare(a, b));
-
-  // Fuse.js for fuzzy autocomplete — loads after defer, so check
-  if (typeof Fuse !== 'undefined') {
-    fuse = new Fuse(allPlaces, { threshold: 0.35, distance: 80 });
-  }
 }
 
 // Get checked values for a checkbox group
@@ -64,56 +40,40 @@ function getChecked(name) {
     .map(el => el.value);
 }
 
-// Main search function
-function runSearch() {
-  const rawQuery = searchInput.value.trim();
-  const query = normalize(rawQuery);
-  const selectedTyp    = getChecked('typ');
-  const selectedJazyk  = getChecked('jazyk');
-  const selectedVyzani = getChecked('vyzani');
-  const rok = rokInput.value ? parseInt(rokInput.value, 10) : null;
+// Main search function — calls /api/search, renders results
+async function runSearch() {
+  const params = new URLSearchParams();
+  const q = searchInput.value.trim();
+  if (q) params.set('q', q);
+  const typ = getChecked('typ');
+  if (typ.length) params.set('typ', typ.join(','));
+  const jazyk = getChecked('jazyk');
+  if (jazyk.length) params.set('jazyk', jazyk.join(','));
+  const vyzani = getChecked('vyzani');
+  if (vyzani.length) params.set('vyzani', vyzani.join(','));
+  const rok = rokInput.value.trim();
+  if (rok) params.set('rok', rok);
+  params.set('page', String(currentPage));
 
-  let candidates;
+  resultCountEl.textContent = 'Hledám…';
+  prevBtn.disabled = true;
+  nextBtn.disabled = true;
 
-  if (query.length === 0) {
-    candidates = allRecords;
-  } else {
-    const keys = [...placeIndex.keys()];
-    const matchingKeys = keys.filter(k => k.includes(query));
-    if (matchingKeys.length === 0) {
-      candidates = [];
-    } else {
-      const indexSet = new Set();
-      matchingKeys.forEach(k => placeIndex.get(k).forEach(i => indexSet.add(i)));
-      candidates = [...indexSet].map(i => allRecords[i]);
-    }
-  }
-
-  if (selectedTyp.length) {
-    candidates = candidates.filter(r =>
-      selectedTyp.some(t => (r.typ ?? []).includes(t))
-    );
-  }
-  if (selectedJazyk.length) {
-    candidates = candidates.filter(r =>
-      selectedJazyk.some(l => (r.jazyk ?? []).includes(l))
-    );
-  }
-  if (selectedVyzani.length) {
-    candidates = candidates.filter(r =>
-      selectedVyzani.includes(r.nabozensky_puvod)
-    );
-  }
-  if (rok !== null) {
-    candidates = candidates.filter(r =>
-      r.rok_od !== null && r.rok_do !== null &&
-      r.rok_od <= rok && rok <= r.rok_do
-    );
+  let data;
+  try {
+    const res = await fetch('/api/search?' + params.toString());
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    data = await res.json();
+  } catch (err) {
+    resultCountEl.innerHTML = `<span style="color:#dc2626">Chyba při vyhledávání: ${escHtml(String(err))}</span>`;
+    resultsEl.style.display = 'none';
+    paginationEl.style.display = 'none';
+    emptyStateEl.style.display = 'none';
+    return;
   }
 
-  currentResults = candidates;
-  currentPage = 1;
-  renderResults();
+  currentTotal = data.total;
+  renderResults(data);
   updateHash();
 }
 
@@ -121,7 +81,7 @@ function runSearch() {
 function onSearchInput() {
   clearTimeout(searchDebounceTimer);
   updateAutocomplete();
-  searchDebounceTimer = setTimeout(runSearch, 200);
+  searchDebounceTimer = setTimeout(() => { currentPage = 1; runSearch(); }, 200);
 }
 
 // Update datalist for autocomplete
@@ -136,23 +96,21 @@ function updateAutocomplete() {
   if (fuse) {
     matches = fuse.search(searchInput.value.trim(), { limit: 10 }).map(r => r.item);
   } else {
-    // Fallback: simple substring
     matches = allPlaces.filter(p => normalize(p).includes(query)).slice(0, 10);
   }
 
   datalist.innerHTML = matches.map(p => `<option value="${escHtml(p)}"></option>`).join('');
 }
 
-// Render results for current page
-function renderResults() {
-  const total = currentResults.length;
-  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+// Render results from API response
+function renderResults(data) {
+  const { total, page, pageSize, results } = data;
+  const totalPages = Math.max(1, Math.ceil(total / pageSize));
 
   // Update count
   const formatted = total.toLocaleString('cs');
   resultCountEl.innerHTML = `Nalezeno: <strong>${formatted}</strong> ${pluralRecords(total)}`;
 
-  // Show/hide empty state
   if (total === 0) {
     resultsEl.style.display = 'none';
     paginationEl.style.display = 'none';
@@ -163,20 +121,16 @@ function renderResults() {
   resultsEl.style.display = '';
   paginationEl.style.display = '';
 
-  const start = (currentPage - 1) * PAGE_SIZE;
-  const pageRecords = currentResults.slice(start, start + PAGE_SIZE);
-
   const fragment = document.createDocumentFragment();
-  pageRecords.forEach(record => fragment.appendChild(renderCard(record)));
+  results.forEach(record => fragment.appendChild(renderCard(record)));
   resultsEl.innerHTML = '';
   resultsEl.appendChild(fragment);
 
   // Pagination controls
-  prevBtn.disabled = currentPage <= 1;
-  nextBtn.disabled = currentPage >= totalPages;
-  pageInfoEl.textContent = `Strana ${currentPage} / ${totalPages}`;
+  prevBtn.disabled = page <= 1;
+  nextBtn.disabled = page >= totalPages;
+  pageInfoEl.textContent = `Strana ${page} / ${totalPages}`;
 
-  // Scroll to top of results on page change
   resultsEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 
@@ -233,7 +187,7 @@ function renderCard(record) {
   });
   article.appendChild(chips);
 
-  // Meta: folio count, physical state
+  // Meta: folio count, dimensions, religion
   const metaParts = [];
   if (record.pocet_folii) metaParts.push(escHtml(record.pocet_folii));
   if (record.rozmery) metaParts.push(escHtml(record.rozmery));
@@ -328,10 +282,11 @@ function resetAll() {
   rokInput.value = '';
   document.querySelectorAll('input[type="checkbox"]').forEach(cb => { cb.checked = false; });
   datalist.innerHTML = '';
+  currentPage = 1;
   runSearch();
 }
 
-// URL hash state: #q=...&typ=...&jazyk=...&vyzani=...
+// URL hash state: #q=...&typ=...&jazyk=...&vyzani=...&rok=...
 function updateHash() {
   const params = new URLSearchParams();
   const q = searchInput.value.trim();
@@ -389,15 +344,21 @@ async function init() {
   resultsEl.style.display = 'none';
   paginationEl.style.display = 'none';
 
+  // Load places for autocomplete from API
   try {
-    const response = await fetch('data.json');
-    allRecords = await response.json();
+    const res = await fetch('/api/places');
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const data = await res.json();
+    allPlaces = data.places ?? [];
+    allPlaces.sort((a, b) => collator.compare(a, b));
+    if (typeof Fuse !== 'undefined') {
+      fuse = new Fuse(allPlaces, { threshold: 0.35, distance: 80 });
+    }
   } catch (err) {
     loadingEl.innerHTML = `<p style="color:#dc2626">Chyba při načítání dat: ${escHtml(String(err))}</p>`;
     return;
   }
 
-  buildIndexes();
   loadingEl.style.display = 'none';
 
   // Restore state from URL hash, then run search
@@ -405,19 +366,20 @@ async function init() {
 
   // Event listeners
   searchInput.addEventListener('input', onSearchInput);
-  searchInput.addEventListener('change', () => { ensureFuse(); runSearch(); });
+  searchInput.addEventListener('change', () => { ensureFuse(); currentPage = 1; runSearch(); });
   rokInput.addEventListener('input', () => {
     clearTimeout(searchDebounceTimer);
-    searchDebounceTimer = setTimeout(runSearch, 300);
+    searchDebounceTimer = setTimeout(() => { currentPage = 1; runSearch(); }, 300);
   });
   document.querySelectorAll('input[type="checkbox"]').forEach(cb =>
-    cb.addEventListener('change', runSearch)
+    cb.addEventListener('change', () => { currentPage = 1; runSearch(); })
   );
   resetBtn.addEventListener('click', resetAll);
   resetLink.addEventListener('click', resetAll);
-  prevBtn.addEventListener('click', () => { currentPage--; renderResults(); });
-  nextBtn.addEventListener('click', () => { currentPage++; renderResults(); });
-  window.addEventListener('hashchange', () => { restoreFromHash(); runSearch(); });
+  // Pagination: call runSearch() since results come from server
+  prevBtn.addEventListener('click', () => { currentPage--; runSearch(); });
+  nextBtn.addEventListener('click', () => { currentPage++; runSearch(); });
+  window.addEventListener('hashchange', () => { restoreFromHash(); currentPage = 1; runSearch(); });
 
   runSearch();
 }
