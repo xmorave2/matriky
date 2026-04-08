@@ -1,2 +1,5 @@
 .vercel
 .claude/skills/parse-pdf/scripts/__pycache__
+.env.local
+node_modules
+.env*.local

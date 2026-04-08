@@ -3,6 +3,10 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
+    "build": "node scripts/hash-data.js",
     "version": "node -e \"require('fs').writeFileSync('version.js', \\\"const APP_VERSION='\\\" + process.env.npm_new_version + \\\"';\\\\n\\\")\" && git add version.js"
+  },
+  "dependencies": {
+    "@neondatabase/serverless": "^0.10.4"
   }
 }
