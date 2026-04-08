@@ -1,2 +1,3 @@
 .vercel
 .claude/skills/parse-pdf/scripts/__pycache__
+node_modules
