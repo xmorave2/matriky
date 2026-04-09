@@ -185,6 +185,7 @@ main {
   flex-shrink: 0;
 }
 .card-sig strong { color: var(--text); display: block; font-size: .8rem; }
+.card-datace { display: block; font-size: .8rem; font-weight: 600; color: var(--text); }
 
 .card-title {
   font-size: .9rem;

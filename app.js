@@ -150,7 +150,7 @@ function renderCard(record) {
 
   const sig = document.createElement('div');
   sig.className = 'card-sig';
-  sig.innerHTML = `<strong>${escHtml(record.signatura ?? '')}</strong>${escHtml(record.datace ?? '')}`;
+  sig.innerHTML = `<strong>${escHtml(record.signatura ?? '')}</strong><span class="card-datace">${escHtml(record.datace ?? '')}</span>`;
 
   header.appendChild(title);
   header.appendChild(sig);
