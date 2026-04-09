@@ -38,8 +38,8 @@ async function syncData(sql, newHash) {
   for (let i = 0; i < records.length; i += BATCH) {
     const batch = records.slice(i, i + BATCH);
     await sql.transaction(batch.map(r => {
-      // Compute search_vector in JS: unaccented (NFD+strip) + lowercase of abbreviated places
-      const sv = (r.matricni_misto_zkracene ?? [])
+      // Compute search_vector in JS: unaccented (NFD+strip) + lowercase of full place names
+      const sv = (r.matricni_misto ?? [])
         .join(' ')
         .normalize('NFD').replace(/\p{Diacritic}/gu, '')
         .toLowerCase();

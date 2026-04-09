@@ -18,7 +18,7 @@ module.exports = async (req, res) => {
 
   try {
     const rows = await sql`
-      SELECT DISTINCT unnest(matricni_misto_zkracene) AS place
+      SELECT DISTINCT unnest(matricni_misto) AS place
       FROM records
       ORDER BY place
     `;
