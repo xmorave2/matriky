@@ -23,6 +23,8 @@ const pageInfoEl     = document.getElementById('page-info');
 const rokInput       = document.getElementById('rok-input');
 const resetBtn       = document.getElementById('reset-btn');
 const resetLink      = document.getElementById('reset-link');
+const filterToggleBtn = document.getElementById('filter-toggle-btn');
+const filterSidebar   = document.getElementById('filter-sidebar');
 const appVersionEl   = document.getElementById('app-version');
 if (appVersionEl && typeof APP_VERSION !== 'undefined') appVersionEl.textContent = APP_VERSION;
 
@@ -131,7 +133,6 @@ function renderResults(data) {
   nextBtn.disabled = page >= totalPages;
   pageInfoEl.textContent = `Strana ${page} / ${totalPages}`;
 
-  resultsEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 
 // Build a record card element
@@ -376,6 +377,11 @@ async function init() {
   );
   resetBtn.addEventListener('click', resetAll);
   resetLink.addEventListener('click', resetAll);
+  filterToggleBtn.addEventListener('click', () => {
+    const isOpen = filterSidebar.classList.toggle('is-open');
+    filterToggleBtn.textContent = isOpen ? 'Skrýt filtry' : 'Zobrazit filtry';
+    filterToggleBtn.setAttribute('aria-expanded', String(isOpen));
+  });
   // Pagination: call runSearch() since results come from server
   prevBtn.addEventListener('click', () => { currentPage--; runSearch(); });
   nextBtn.addEventListener('click', () => { currentPage++; runSearch(); });

@@ -14,65 +14,77 @@
 </header>
 
 <main>
-  <div class="search-panel">
-    <div class="search-row">
-      <input type="search" id="search-input" placeholder="Hledat podle místa (např. Babice, Hradec Králové…)" autocomplete="off" list="place-suggestions" aria-label="Hledat podle místa">
-      <datalist id="place-suggestions"></datalist>
+  <div class="main-content">
+    <div class="search-panel">
+      <div class="search-row">
+        <input type="search" id="search-input" placeholder="Hledat podle místa (např. Babice, Hradec Králové…)" autocomplete="off" list="place-suggestions" aria-label="Hledat podle místa">
+        <datalist id="place-suggestions"></datalist>
+      </div>
+      <button id="filter-toggle-btn" type="button" aria-expanded="false" aria-controls="filter-sidebar">Zobrazit filtry</button>
     </div>
 
-    <div class="filters">
-      <div class="filter-group">
-        <h3>Typ záznamu</h3>
-        <label><input type="checkbox" name="typ" value="matrika NAROZENÝCH"> matrika narozených</label>
-        <label><input type="checkbox" name="typ" value="matrika ZEMŘELÝCH"> matrika zemřelých</label>
-        <label><input type="checkbox" name="typ" value="matrika ODDANÝCH"> matrika oddaných</label>
-        <label><input type="checkbox" name="typ" value="index NAROZENÝCH"> index narozených</label>
-        <label><input type="checkbox" name="typ" value="index ZEMŘELÝCH"> index zemřelých</label>
-        <label><input type="checkbox" name="typ" value="index ODDANÝCH"> index oddaných</label>
+    <aside id="filter-sidebar" class="filter-sidebar">
+      <div class="sidebar-header">
+        <span class="sidebar-title">Filtry</span>
       </div>
 
-      <div class="filter-group">
-        <h3>Jazyk</h3>
-        <label><input type="checkbox" name="jazyk" value="čeština"> čeština</label>
-        <label><input type="checkbox" name="jazyk" value="němčina"> němčina</label>
-        <label><input type="checkbox" name="jazyk" value="latina"> latina</label>
+      <div class="filters">
+        <div class="filter-group">
+          <h3>Typ záznamu</h3>
+          <label><input type="checkbox" name="typ" value="matrika NAROZENÝCH"> matrika narozených</label>
+          <label><input type="checkbox" name="typ" value="matrika ZEMŘELÝCH"> matrika zemřelých</label>
+          <label><input type="checkbox" name="typ" value="matrika ODDANÝCH"> matrika oddaných</label>
+          <label><input type="checkbox" name="typ" value="index NAROZENÝCH"> index narozených</label>
+          <label><input type="checkbox" name="typ" value="index ZEMŘELÝCH"> index zemřelých</label>
+          <label><input type="checkbox" name="typ" value="index ODDANÝCH"> index oddaných</label>
+        </div>
+
+        <div class="filter-group">
+          <h3>Jazyk</h3>
+          <label><input type="checkbox" name="jazyk" value="čeština"> čeština</label>
+          <label><input type="checkbox" name="jazyk" value="němčina"> němčina</label>
+          <label><input type="checkbox" name="jazyk" value="latina"> latina</label>
+        </div>
+
+        <div class="filter-group">
+          <h3>Rok</h3>
+          <input type="number" id="rok-input" placeholder="např. 1850" min="1500" max="2000" aria-label="Filtrovat podle roku">
+        </div>
+
+        <div class="filter-group">
+          <h3>Vyznání</h3>
+          <label><input type="checkbox" name="vyzani" value="římskokatolická"> římskokatolická</label>
+          <label><input type="checkbox" name="vyzani" value="evangelická"> evangelická</label>
+          <label><input type="checkbox" name="vyzani" value="civilní"> civilní</label>
+        </div>
       </div>
 
-      <div class="filter-group">
-        <h3>Rok</h3>
-        <input type="number" id="rok-input" placeholder="např. 1850" min="1500" max="2000" aria-label="Filtrovat podle roku">
+      <div class="filter-footer">
+        <button id="reset-btn" type="button">Zrušit filtry</button>
+      </div>
+    </aside>
+
+    <div class="results-col">
+      <div id="result-count-bar"><span id="result-count"></span></div>
+
+      <div id="loading">
+        <div class="spinner"></div>
+        <p>Načítám data…</p>
       </div>
 
-      <div class="filter-group">
-        <h3>Vyznání</h3>
-        <label><input type="checkbox" name="vyzani" value="římskokatolická"> římskokatolická</label>
-        <label><input type="checkbox" name="vyzani" value="evangelická"> evangelická</label>
-        <label><input type="checkbox" name="vyzani" value="civilní"> civilní</label>
+      <div id="empty-state">
+        <p>Žádné záznamy neodpovídají zadaným kritériím.</p>
+        <p><a id="reset-link">Zrušit filtry</a></p>
+      </div>
+
+      <div id="results" role="list" aria-live="polite"></div>
+
+      <div id="pagination" aria-label="Stránkování">
+        <button id="prev-btn" type="button" disabled>← Předchozí</button>
+        <span id="page-info"></span>
+        <button id="next-btn" type="button" disabled>Další →</button>
       </div>
     </div>
-
-    <div class="filter-footer">
-      <button id="reset-btn" type="button">Zrušit filtry</button>
-      <span id="result-count"></span>
-    </div>
-  </div>
-
-  <div id="loading">
-    <div class="spinner"></div>
-    <p>Načítám data…</p>
-  </div>
-
-  <div id="empty-state">
-    <p>Žádné záznamy neodpovídají zadaným kritériím.</p>
-    <p><a id="reset-link">Zrušit filtry</a></p>
-  </div>
-
-  <div id="results" role="list" aria-live="polite"></div>
-
-  <div id="pagination" aria-label="Stránkování">
-    <button id="prev-btn" type="button" disabled>← Předchozí</button>
-    <span id="page-info"></span>
-    <button id="next-btn" type="button" disabled>Další →</button>
   </div>
 </main>
 
