@@ -43,7 +43,7 @@ module.exports = async (req, res) => {
         COUNT(*) OVER() AS total_count
       FROM records
       WHERE
-        (${qNorm} = '' OR search_vector LIKE ${'%' + qNorm + '%'})
+        (${qNorm} = '' OR search_vector LIKE ${'%' + qNorm + '%'} OR (${q} != '' AND ${q} = ANY(matricni_misto)))
         AND (${typArr.length === 0} OR typ && ${typArr}::text[])
         AND (${jazykArr.length === 0} OR jazyk && ${jazykArr}::text[])
         AND (${vyzaniArr.length === 0} OR nabozensky_puvod = ANY(${vyzaniArr}::text[]))
